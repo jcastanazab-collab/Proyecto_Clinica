@@ -1,0 +1,309 @@
+# ============================================================================
+# CI PIPELINE SECE — Fase 2 ACS UMG
+# ============================================================================
+# Autor: Jair Moshed Castañaza Barrera (Ingeniero DevOps / Automatización)
+# ----------------------------------------------------------------------------
+# Pipeline con 5 etapas conforme a la rúbrica E13:
+#   1. Build          → setup uv + install deps
+#   2. Lint           → análisis estático con Ruff (sustituto cloud de Sonar)
+#   3. Unit tests     → pytest unitarias con cobertura (quality gate)
+#   4. Integration    → pytest completo contra PostgreSQL
+#   5. API tests      → Newman + colección Postman
+# ----------------------------------------------------------------------------
+# Trigger: PR a dev/qa/main + push a esas ramas (bloquea el merge si falla)
+# ============================================================================
+
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [dev, qa, main]
+  push:
+    branches: [dev, qa, main]
+
+# Cancelar runs anteriores si hay commits nuevos en la misma rama
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+
+  # ==========================================================================
+  # ETAPA 1: BUILD — Setup del entorno y resolución de dependencias
+  # ==========================================================================
+  build:
+    name: "1. Build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias con uv sync
+        run: uv sync
+
+      - name: Verificar instalación
+        run: |
+          uv run python --version
+          uv run pytest --version
+          uv run alembic --version
+
+  # ==========================================================================
+  # ETAPA 2: LINT — Análisis estático con Ruff
+  # ==========================================================================
+  # (SonarQube corre localmente — ver scripts/sonar-scan.ps1)
+  # En CI usamos Ruff como análisis estático complementario.
+  # ==========================================================================
+  lint:
+    name: "2. Lint (Ruff)"
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Instalar deps
+        run: uv sync
+
+      - name: Ruff check (reglas E, F, I)
+        run: uv run ruff check app/ --output-format=github
+        continue-on-error: false
+
+      - name: Ruff format check
+        run: uv run ruff format --check app/
+        continue-on-error: true  # No bloquea el PR, solo informa
+
+  # ==========================================================================
+  # ETAPA 3: UNIT TESTS — Pruebas unitarias con cobertura y quality gate
+  # ==========================================================================
+  unit-tests:
+    name: "3. Unit tests (50 pruebas con mocks)"
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Instalar deps
+        run: uv sync
+
+      - name: Ejecutar SOLO pruebas unitarias (sin BD)
+        run: uv run pytest app/tests/unit/ -v --tb=short
+
+      - name: Validar que son al menos 30 pruebas unitarias (requisito E10)
+        run: |
+          COUNT=$(uv run pytest app/tests/unit/ --collect-only -q 2>&1 | grep -cE "^app/tests/unit")
+          echo "Pruebas unitarias detectadas: $COUNT"
+          if [ "$COUNT" -lt 30 ]; then
+            echo "::error::Se requieren al menos 30 pruebas unitarias (E10). Encontradas: $COUNT"
+            exit 1
+          fi
+
+  # ==========================================================================
+  # ETAPA 4: INTEGRATION TESTS — Pytest completo contra PostgreSQL + cobertura
+  # ==========================================================================
+  integration-tests:
+    name: "4. Integration tests + coverage"
+    runs-on: ubuntu-latest
+    needs: build
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sece_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/sece_test
+      JWT_SECRET: test-secret
+      ADMIN_EMAIL: admin@sece.local
+      ADMIN_PASSWORD: Admin1234!
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Instalar deps
+        run: uv sync
+
+      - name: Esperar PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Esperando a Postgres..."
+            sleep 2
+          done
+
+      - name: Aplicar migraciones Alembic
+        run: uv run alembic upgrade head
+
+      - name: Seedear usuario administrador
+        run: uv run python -m app.scripts.seed_admin
+
+      - name: Correr suite completa con cobertura
+        run: |
+          uv run pytest \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --junitxml=pytest-report.xml
+
+      - name: Quality gate — cobertura mínima global (60%)
+        run: |
+          COVERAGE=$(uv run python -c "import xml.etree.ElementTree as ET; print(float(ET.parse('coverage.xml').getroot().attrib['line-rate'])*100)")
+          echo "Cobertura actual: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "::error::Cobertura ${COVERAGE}% < 60% requerido"
+            exit 1
+          fi
+
+      - name: Subir reporte de cobertura como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            htmlcov/
+            coverage.xml
+            pytest-report.xml
+          retention-days: 30
+
+  # ==========================================================================
+  # ETAPA 5: API TESTS — Newman + colección Postman
+  # ==========================================================================
+  api-tests:
+    name: "5. API tests (Newman + Postman)"
+    runs-on: ubuntu-latest
+    needs: integration-tests
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sece_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/sece_test
+      JWT_SECRET: test-secret
+      ADMIN_EMAIL: admin@sece.local
+      ADMIN_PASSWORD: Admin1234!
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Instalar deps Python
+        run: uv sync
+
+      - name: Setup Node.js para Newman
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar Newman + reporter
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Aplicar migraciones + seed admin
+        run: |
+          uv run alembic upgrade head
+          uv run python -m app.scripts.seed_admin
+
+      - name: Levantar app FastAPI en background
+        run: |
+          nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+          echo "Esperando que la API esté lista..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health | grep -q "ok"; then
+              echo "API lista"; break
+            fi
+            sleep 1
+          done
+
+      - name: Verificar que la colección Postman existe
+        id: check-collection
+        run: |
+          if [ -f tests/api/sece.postman_collection.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::Colección Postman aún no creada (E11 pendiente)"
+          fi
+
+      - name: Correr Newman
+        if: steps.check-collection.outputs.exists == 'true'
+        run: |
+          newman run tests/api/sece.postman_collection.json \
+            --environment tests/api/sece.postman_environment.json \
+            --reporters cli,htmlextra,junit \
+            --reporter-htmlextra-export newman-report.html \
+            --reporter-junit-export newman-report.xml
+
+      - name: Subir reporte Newman como artifact
+        if: always() && steps.check-collection.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-report
+          path: |
+            newman-report.html
+            newman-report.xml
+          retention-days: 30
+
+      - name: Log uvicorn (debug si falla)
+        if: failure()
+        run: cat uvicorn.log || true
+
+  # ==========================================================================
+  # RESUMEN FINAL — Status check consolidado para branch protection
+  # ==========================================================================
+  pipeline-status:
+    name: "✓ Pipeline Status"
+    runs-on: ubuntu-latest
+    needs: [build, lint, unit-tests, integration-tests, api-tests]
+    if: always()
+    steps:
+      - name: Verificar estado de todas las etapas
+        run: |
+          echo "Build:        ${{ needs.build.result }}"
+          echo "Lint:         ${{ needs.lint.result }}"
+          echo "Unit tests:   ${{ needs.unit-tests.result }}"
+          echo "Integration:  ${{ needs.integration-tests.result }}"
+          echo "API tests:    ${{ needs.api-tests.result }}"
+          if [[ "${{ needs.build.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "::error::Pipeline falló en al menos una etapa crítica"
+            exit 1
+          fi
+          echo "::notice::Pipeline completo exitosamente"
