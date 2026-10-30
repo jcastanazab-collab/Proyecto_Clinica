@@ -71,7 +71,10 @@ async def test_emitir_receta(
         f"/api/v1/consultas/{consulta_id}/recetas",
         json={
             "medicamentos": [
-                {"nombre": "Losartán", "dosis": "50mg", "via": "oral", "frecuencia": "1 vez al día", "duracion": "30 días"},
+                {
+                    "nombre": "Losartán", "dosis": "50mg", "via": "oral",
+                    "frecuencia": "1 vez al día", "duracion": "30 días",
+                },
                 {"nombre": "Amlodipino", "dosis": "5mg", "via": "oral", "frecuencia": "1 vez al día"},
             ]
         },

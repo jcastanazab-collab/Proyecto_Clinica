@@ -18,6 +18,7 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
 
     from sqlalchemy import select
+
     from app.models.usuario import Usuario
 
     result = await db.execute(select(Usuario).where(Usuario.id == payload["sub"]))
