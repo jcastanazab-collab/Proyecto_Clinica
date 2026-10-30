@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -142,8 +142,9 @@ async def eliminar_paciente(
         return RedirectResponse("/pacientes?error=Paciente no encontrado", status_code=302)
     total_citas = await repo.count_citas(db, paciente_id)
     if total_citas > 0:
+        msg = f"No se puede eliminar: el paciente tiene {total_citas} cita(s) registrada(s)"
         return RedirectResponse(
-            f"/pacientes/{paciente_id}?error=No se puede eliminar: el paciente tiene {total_citas} cita(s) registrada(s)",
+            f"/pacientes/{paciente_id}?error={msg}",
             status_code=302,
         )
     nombre = paciente.nombre_completo

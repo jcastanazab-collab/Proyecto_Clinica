@@ -4,12 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.models.cita import Cita
-from app.models.enums import Rol
+from app.models.enums import EstadoCita, Rol
 from app.models.usuario import Usuario
 from app.repositories import cita as repo
 from app.repositories import medico as medico_repo
 from app.repositories import paciente as paciente_repo
-from app.models.enums import EstadoCita
 from app.schemas.cita import CitaCreate, CitaRead, CitaUpdate
 
 router = APIRouter(prefix="/citas", tags=["Citas"])

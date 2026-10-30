@@ -7,10 +7,10 @@ from app.core.database import get_db
 from app.core.deps import require_role
 from app.models.consulta import Consulta
 from app.models.enums import EstadoCita, Rol
-from app.models.signos_vitales import SignosVitales
-from app.models.usuario import Usuario
 from app.models.medicamento_receta import MedicamentoReceta
 from app.models.receta import Receta
+from app.models.signos_vitales import SignosVitales
+from app.models.usuario import Usuario
 from app.repositories import cita as cita_repo
 from app.repositories import consulta as repo
 from app.repositories import receta as receta_repo

@@ -19,6 +19,7 @@ env/
 
 # Environment variables
 .env
+.env.*
 !.env.example
 
 # Alembic
@@ -39,3 +40,21 @@ Thumbs.db
 .coverage
 htmlcov/
 coverage.xml
+# ============================================================================
+# Artefactos de CI/CD (Fase 2)
+# ============================================================================
+# Reportes de pytest y cobertura
+coverage.xml
+pytest-report.xml
+htmlcov-baseline/
+
+# Reportes Newman
+newman-report.html
+newman-report.xml
+
+# Logs
+uvicorn.log
+*.log
+
+# Sonar scanner work directory
+.scannerwork/
