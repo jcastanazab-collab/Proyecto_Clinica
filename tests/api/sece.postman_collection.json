@@ -696,7 +696,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "{{admin_token}}",
+              "value": "{{medico_token}}",
               "type": "string"
             }
           ]
@@ -724,6 +724,40 @@
               "});"
             ],
             "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Login como el medico creado en el request 06 para obtener medico_token",
+              "if (!pm.environment.get('medico_token')) {",
+              "    const base = pm.environment.get('BASE_URL') || pm.collectionVariables.get('BASE_URL');",
+              "    const runId = pm.environment.get('run_id') || pm.collectionVariables.get('run_id');",
+              "    pm.sendRequest({",
+              "        url: base + '/api/v1/auth/login',",
+              "        method: 'POST',",
+              "        header: { 'Content-Type': 'application/json' },",
+              "        body: {",
+              "            mode: 'raw',",
+              "            raw: JSON.stringify({",
+              "                email: 'medico.pm2.' + runId + '@sece.com',",
+              "                password: 'MedTemp2026!'",
+              "            })",
+              "        }",
+              "    }, (err, res) => {",
+              "        if (err) { console.log('Login medico error:', err); return; }",
+              "        if (res.code === 200) {",
+              "            const j = res.json();",
+              "            pm.environment.set('medico_token', j.access_token);",
+              "            console.log('medico_token guardado OK');",
+              "        } else {",
+              "            console.log('Login medico fallido:', res.code, res.text());",
+              "        }",
+              "    });",
+              "}"
+            ]
           }
         }
       ]
@@ -756,7 +790,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "{{admin_token}}",
+              "value": "{{medico_token}}",
               "type": "string"
             }
           ]
