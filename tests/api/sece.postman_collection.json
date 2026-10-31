@@ -170,7 +170,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre\": \"Dr. Postman Test\",\n  \"email\": \"medico.pm.{{run_id}}@sece.local\",\n  \"password\": \"MedTemp2026!\",\n  \"rol\": \"MEDICO\"\n}",
+          "raw": "{\n  \"nombre\": \"Dr. Postman Test\",\n  \"email\": \"medico.pm.{{run_id}}@sece.com\",\n  \"password\": \"MedTemp2026!\",\n  \"rol\": \"MEDICO\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -228,7 +228,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre\": \"Duplicado\",\n  \"email\": \"medico.pm.{{run_id}}@sece.local\",\n  \"password\": \"Otro1234!\",\n  \"rol\": \"RECEPCIONISTA\"\n}",
+          "raw": "{\n  \"nombre\": \"Duplicado\",\n  \"email\": \"medico.pm.{{run_id}}@sece.com\",\n  \"password\": \"Otro1234!\",\n  \"rol\": \"RECEPCIONISTA\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -281,7 +281,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre\": \"Dr. Postman Test\",\n  \"especialidad\": \"Medicina General\",\n  \"num_colegiado\": \"COL-PM-{{run_id}}\",\n  \"email\": \"medico.pm2.{{run_id}}@sece.local\",\n  \"password\": \"MedTemp2026!\"\n}",
+          "raw": "{\n  \"nombre\": \"Dr. Postman Test\",\n  \"especialidad\": \"Medicina General\",\n  \"num_colegiado\": \"COL-PM-{{run_id}}\",\n  \"email\": \"medico.pm2.{{run_id}}@sece.com\",\n  \"password\": \"MedTemp2026!\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -339,7 +339,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre_completo\": \"Paciente Postman Test\",\n  \"dpi\": \"1234567{{run_id_short}}\",\n  \"fecha_nacimiento\": \"1988-06-15\",\n  \"sexo\": \"F\",\n  \"telefono\": \"55551234\",\n  \"email\": \"paciente.pm@correo.local\",\n  \"direccion\": \"Zona 10, Ciudad Guatemala\"\n}",
+          "raw": "{\n  \"nombre_completo\": \"Paciente Postman Test\",\n  \"dpi\": \"1234567{{run_id_short}}\",\n  \"fecha_nacimiento\": \"1988-06-15\",\n  \"sexo\": \"F\",\n  \"telefono\": \"55551234\",\n  \"email\": \"paciente.pm@correo.com\",\n  \"direccion\": \"Zona 10, Ciudad Guatemala\"\n}",
           "options": {
             "raw": {
               "language": "json"
